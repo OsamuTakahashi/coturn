@@ -114,7 +114,7 @@ DEFAULT_STUN_PORT,DEFAULT_STUN_TLS_PORT,0,0,1,
   NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0,0,NULL,NULL,NULL
 },
 {NULL, 0},{NULL, 0},
-NEV_UNKNOWN, 
+NEV_UNKNOWN,
 { "Unknown", "UDP listening socket per session", "UDP thread per network endpoint", "UDP thread per CPU core" },
 //////////////// Relay servers //////////////////////////////////
 LOW_DEFAULT_PORTS_BOUNDARY,HIGH_DEFAULT_PORTS_BOUNDARY,0,0,0,"",
@@ -149,7 +149,10 @@ TURN_CREDENTIALS_NONE, /* ct */
 ///////////// Users DB //////////////
 { (TURN_USERDB_TYPE)0, {"\0"}, {0,NULL, {NULL,0}} },
 ///////////// CPUs //////////////////
-DEFAULT_CPUS_NUMBER
+DEFAULT_CPUS_NUMBER,
+///////////// EXTRA /////////////////
+"",
+""
 };
 
 //////////////// OpenSSL Init //////////////////////
@@ -679,7 +682,7 @@ static char AdminUsage[] = "Usage: turnadmin [command] [options]\n"
 	"	-h, --help			Help\n";
 
 #define OPTIONS "c:d:p:L:E:X:i:m:l:r:u:b:B:e:M:J:N:O:q:Q:s:C:vVofhznaAS"
-  
+
 #define ADMIN_OPTIONS "PgGORIHKYlLkaADSdb:e:M:J:N:u:r:p:s:X:o:h"
 
 enum EXTRA_OPTS {
@@ -748,7 +751,9 @@ enum EXTRA_OPTS {
 	SERVER_NAME_OPT,
 	OAUTH_OPT,
 	PROD_OPT,
-	NO_HTTP_OPT
+	NO_HTTP_OPT,
+
+	CLUSTER_DB_OPT
 };
 
 struct myoption {
@@ -867,6 +872,9 @@ static const struct myoption long_options[] = {
 				{ "no-tlsv1", optional_argument, NULL, NO_TLSV1_OPT },
 				{ "no-tlsv1_1", optional_argument, NULL, NO_TLSV1_1_OPT },
 				{ "no-tlsv1_2", optional_argument, NULL, NO_TLSV1_2_OPT },
+#if !defined(TURN_NO_HIREDIS)
+				{ "redis-clusterdb", optional_argument, NULL, CLUSTER_DB_OPT },
+#endif
 				{ NULL, no_argument, NULL, 0 }
 };
 
@@ -1116,6 +1124,7 @@ static void set_option(int c, char *value)
 		break;
 	case 'X':
 		if(value) {
+			STRCPY(turn_params.readable_external_ip,value);
 			char *div = strchr(value,'/');
 			if(div) {
 				char *nval=turn_strdup(value);
@@ -1226,6 +1235,9 @@ static void set_option(int c, char *value)
 	case 'O':
 		STRCPY(turn_params.redis_statsdb, value);
 		turn_params.use_redis_statsdb = 1;
+		break;
+	case CLUSTER_DB_OPT:
+		STRCPY(turn_params.redis_clusterdb, value);
 		break;
 #endif
 	case AUTH_SECRET_OPT:

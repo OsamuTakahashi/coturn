@@ -164,28 +164,28 @@ typedef struct _turn_params_ {
 //////////////// OpenSSL group //////////////////////
 
   SSL_CTX *tls_ctx_ssl23;
-  
+
   SSL_CTX *tls_ctx_v1_0;
-  
+
 #if TLSv1_1_SUPPORTED
   SSL_CTX *tls_ctx_v1_1;
 #if TLSv1_2_SUPPORTED
   SSL_CTX *tls_ctx_v1_2;
 #endif
 #endif
-  
+
 #if DTLS_SUPPORTED
   SSL_CTX *dtls_ctx;
 #if DTLSv1_2_SUPPORTED
   SSL_CTX *dtls_ctx_v1_2;
 #endif
 #endif
-  
+
   DH_KEY_SIZE dh_key_size;
-  
+
   char cipher_list[1025];
   char ec_curve_name[33];
-  
+
   char ca_cert_file[1025];
   char cert_file[1025];
   char pkey_file[1025];
@@ -218,7 +218,7 @@ typedef struct _turn_params_ {
 
   int no_udp;
   int no_tcp;
-  
+
   vint no_tcp_relay;
   vint no_udp_relay;
 
@@ -306,6 +306,11 @@ typedef struct _turn_params_ {
 
   unsigned long cpus;
 
+/////// EXTRA /////////////
+
+  char readable_external_ip[1025];
+	char redis_clusterdb[1025];
+
 } turn_params_t;
 
 extern turn_params_t turn_params;
@@ -355,6 +360,9 @@ band_limit_t get_max_bps(void);
 void set_max_bps(band_limit_t value);
 
 ///////////////////////////////
+
+void report_alloc(void);
+void report_release(void);
 
 #ifdef __cplusplus
 }

@@ -1672,7 +1672,7 @@ ioa_socket_handle detach_ioa_socket(ioa_socket_handle s)
 		addr_cpy(&(ret->local_addr),&(s->local_addr));
 		ret->connected = s->connected;
 		addr_cpy(&(ret->remote_addr),&(s->remote_addr));
-		
+
 		delete_socket_from_map(s);
 		delete_socket_from_parent(s);
 
@@ -2624,7 +2624,7 @@ void close_ioa_socket_after_processing_if_necessary(ioa_socket_handle s)
 
 static void socket_output_handler_bev(struct bufferevent *bev, void* arg)
 {
-	
+
 	UNUSED_ARG(bev);
 	UNUSED_ARG(arg);
 
@@ -3192,7 +3192,7 @@ int send_data_from_ioa_socket_nbh(ioa_socket_handle s, ioa_addr* dest_addr,
 							  char sto[129];
 							  addr_to_string(dest_addr, (u08bits*)sto);
 							  TURN_LOG_FUNC(TURN_LOG_LEVEL_ERROR,
-									"%s: network error: address unreachable from %s to %s\n", 
+									"%s: network error: address unreachable from %s to %s\n",
 									__FUNCTION__,sfrom,sto);
 							}
 #endif
@@ -3539,6 +3539,9 @@ const char* get_ioa_socket_ssl_method(ioa_socket_handle s)
 	return "no SSL";
 }
 
+void report_alloc(void);
+void report_release(void);
+
 void turn_report_allocation_set(void *a, turn_time_t lifetime, int refresh)
 {
 	if(a) {
@@ -3568,6 +3571,7 @@ void turn_report_allocation_set(void *a, turn_time_t lifetime, int refresh)
 					}
 					send_message_to_redis(e->rch, "set", key, "%s lifetime=%lu", status, (unsigned long)lifetime);
 					send_message_to_redis(e->rch, "publish", key, "%s lifetime=%lu", status, (unsigned long)lifetime);
+					report_alloc();
 				}
 #endif
 			}
@@ -3604,6 +3608,7 @@ void turn_report_allocation_delete(void *a)
 						snprintf(key, sizeof(key), "turn/user/%s/allocation/%018llu/total_traffic", (char*)ss->username, (unsigned long long)ss->id);
 					}
 					send_message_to_redis(e->rch, "publish", key, "rcvp=%lu, rcvb=%lu, sentp=%lu, sentb=%lu", (unsigned long)(ss->t_received_packets), (unsigned long)(ss->t_received_bytes), (unsigned long)(ss->t_sent_packets), (unsigned long)(ss->t_sent_bytes));
+					report_release();
 				}
 #endif
 			}

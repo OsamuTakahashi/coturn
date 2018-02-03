@@ -31,7 +31,7 @@
 #ifndef __IOADEFS__
 #define __IOADEFS__
 
-#define TURN_SERVER_VERSION "4.5.0.8"
+#define TURN_SERVER_VERSION "4.5.0.8-C"
 #define TURN_SERVER_VERSION_NAME "dan Eider"
 #define TURN_SOFTWARE "Coturn-" TURN_SERVER_VERSION " '" TURN_SERVER_VERSION_NAME "'"
 
@@ -142,7 +142,7 @@ static inline u64bits _ioa_ntoh64(u64bits v)
 
 #define debug_ptr_add(ptr)
 #define debug_ptr_del(ptr)
-#define tm_print() 
+#define tm_print()
 #define turn_malloc(sz) malloc((size_t)(sz))
 #define turn_free(ptr,sz) free((ptr))
 #define turn_realloc(ptr, old_sz, new_sz) realloc((ptr),(size_t)(new_sz))
@@ -250,5 +250,5 @@ typedef u32bits turn_time_t;
 }
 #endif
 
-#endif 
+#endif
 /* __IODEFS__ */

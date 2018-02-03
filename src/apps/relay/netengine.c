@@ -94,6 +94,24 @@ static void barrier_wait_func(const char* func, int line)
 
 #define barrier_wait() barrier_wait_func(__FUNCTION__,__LINE__)
 
+static pthread_mutex_t mutex_alloc;
+
+static volatile int current_allocation = 0;
+
+void report_alloc(void)
+{
+	pthread_mutex_lock(&mutex_alloc);
+	current_allocation ++;
+	pthread_mutex_unlock(&mutex_alloc);
+}
+
+void report_release(void)
+{
+	pthread_mutex_lock(&mutex_alloc);
+	current_allocation --;
+	pthread_mutex_unlock(&mutex_alloc);
+}
+
 /////////////// Bandwidth //////////////////
 
 static pthread_mutex_t mutex_bps;
@@ -391,17 +409,17 @@ void send_auth_message_to_auth_server(struct auth_message *am)
 static void auth_server_receive_message(struct bufferevent *bev, void *ptr)
 {
   UNUSED_ARG(ptr);
-  
+
   struct auth_message am;
   int n = 0;
   struct evbuffer *input = bufferevent_get_input(bev);
-  
+
   while ((n = evbuffer_remove(input, &am, sizeof(struct auth_message))) > 0) {
     if (n != sizeof(struct auth_message)) {
       fprintf(stderr,"%s: Weird buffer error: size=%d\n",__FUNCTION__,n);
       continue;
     }
-    
+
     {
       hmackey_t key;
       if(get_user_key(am.in_oauth,&(am.out_oauth),&(am.max_session_time),am.username,am.realm,key,am.in_buffer.nbh)<0) {
@@ -411,11 +429,11 @@ static void auth_server_receive_message(struct bufferevent *bev, void *ptr)
     	  am.success = 1;
       }
     }
-    
+
     size_t dest = am.id;
-    
+
     struct evbuffer *output = NULL;
-    
+
     if(dest>=TURNSERVER_ID_BOUNDARY_BETWEEN_TCP_AND_UDP) {
       dest -= TURNSERVER_ID_BOUNDARY_BETWEEN_TCP_AND_UDP;
       if(dest >= get_real_udp_relay_servers_number()) {
@@ -446,7 +464,7 @@ static void auth_server_receive_message(struct bufferevent *bev, void *ptr)
     	  output = bufferevent_get_output(general_relay_servers[dest]->auth_out_buf);
       }
     }
-    
+
     if(output)
       evbuffer_add(output,&am,sizeof(struct auth_message));
     else {
@@ -503,7 +521,7 @@ static int send_socket_to_general_relay(ioa_engine_handle e, struct message_to_r
 	return 0;
 }
 
-static int send_socket_to_relay(turnserver_id id, u64bits cid, stun_tid *tid, ioa_socket_handle s, 
+static int send_socket_to_relay(turnserver_id id, u64bits cid, stun_tid *tid, ioa_socket_handle s,
 				int message_integrity, MESSAGE_TO_RELAY_TYPE rmt, ioa_net_data *nd,
 				int can_resume)
 {
@@ -1556,9 +1574,38 @@ static void run_events(struct event_base *eb, ioa_engine_handle e)
 #endif
 }
 
+#if !defined(TURN_NO_HIREDIS)
+static void report_node_live(redis_context_handle rctx,const char *value)
+{
+	static time_t last_report_time = 0;
+
+	time_t now = time(NULL);
+	if (now - last_report_time >= 15) {
+		send_message_to_redis(rctx,"set",turn_params.oauth_server_name,"%s:%d",value,current_allocation);
+		send_message_to_redis(rctx,"expire",turn_params.oauth_server_name,"30");
+		// TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO,"setex %s 30 %s\n",turn_params.oauth_server_name,value);
+		last_report_time = now;
+	}
+}
+#endif
+
 void run_listener_server(struct listener_server *ls)
 {
 	unsigned int cycle = 0;
+	char addr[256];
+	int use_redis_cluster = 0;
+
+#if !defined(TURN_NO_HIREDIS)
+	redis_context_handle rctx;
+	sprintf(addr,"%s:%d",turn_params.readable_external_ip,turn_params.listener_port);
+
+	if (turn_params.redis_clusterdb[0]) {
+		rctx = get_redis_async_connection(ls->event_base, turn_params.redis_clusterdb, 0);
+		TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO, "Cluster DB=%s\n", turn_params.redis_clusterdb);
+		use_redis_cluster = 1;
+	}
+#endif
+
 	while (!turn_params.stop_turn_server) {
 
 		if (eve(turn_params.verbose)) {
@@ -1573,6 +1620,10 @@ void run_listener_server(struct listener_server *ls)
 
 		tm_print();
 
+#if !defined(TURN_NO_HIREDIS)
+		if (use_redis_cluster)
+			report_node_live(rctx, addr);
+#endif
 	}
 }
 
@@ -1652,7 +1703,7 @@ static void setup_relay_server(struct relay_server *rs, ioa_engine_handle e, int
 			 send_https_socket,
 			 allocate_bps,
 			 turn_params.oauth, turn_params.oauth_server_name, use_http);
-	
+
 	if(to_set_rfc5780) {
 		set_rfc5780(&(rs->server), get_alt_addr, send_message_from_listener_to_client);
 	}
@@ -1666,7 +1717,7 @@ static void *run_general_relay_thread(void *arg)
 {
   static int always_true = 1;
   struct relay_server *rs = (struct relay_server *)arg;
-  
+
   int udp_reuses_the_same_relay_server = (turn_params.general_relay_servers_number<=1) || (turn_params.net_engine_version == NEV_UDP_SOCKET_PER_THREAD) || (turn_params.net_engine_version == NEV_UDP_SOCKET_PER_SESSION);
 
   int we_need_rfc5780 = udp_reuses_the_same_relay_server && turn_params.rfc5780;
@@ -1680,7 +1731,7 @@ static void *run_general_relay_thread(void *arg)
   while(always_true) {
     run_events(rs->event_base, rs->ioa_eng);
   }
-  
+
   return arg;
 }
 
