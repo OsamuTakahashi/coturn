@@ -1575,14 +1575,14 @@ static void run_events(struct event_base *eb, ioa_engine_handle e)
 }
 
 #if !defined(TURN_NO_HIREDIS)
-static void report_node_live(redis_context_handle rctx,const char *value)
+static void report_node_live(redis_context_handle rctx,const char *key)
 {
 	static time_t last_report_time = 0;
 
 	time_t now = time(NULL);
 	if (now - last_report_time >= 15) {
-		send_message_to_redis(rctx,"set",turn_params.oauth_server_name,"%s:%d",value,current_allocation);
-		send_message_to_redis(rctx,"expire",turn_params.oauth_server_name,"30");
+		send_message_to_redis(rctx,"set",key,"%d",current_allocation);
+		send_message_to_redis(rctx,"expire",key,"30");
 		// TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO,"setex %s 30 %s\n",turn_params.oauth_server_name,value);
 		last_report_time = now;
 	}
@@ -1592,16 +1592,18 @@ static void report_node_live(redis_context_handle rctx,const char *value)
 void run_listener_server(struct listener_server *ls)
 {
 	unsigned int cycle = 0;
-	char addr[256];
+	char key[1025];
 	int use_redis_cluster = 0;
 
 #if !defined(TURN_NO_HIREDIS)
 	redis_context_handle rctx;
-	sprintf(addr,"%s:%d",turn_params.readable_external_ip,turn_params.listener_port);
 
 	if (turn_params.redis_clusterdb[0]) {
 		rctx = get_redis_async_connection(ls->event_base, turn_params.redis_clusterdb, 0);
 		TURN_LOG_FUNC(TURN_LOG_LEVEL_INFO, "Cluster DB=%s\n", turn_params.redis_clusterdb);
+
+		sprintf(key,"relaynode/%s/%s/%d",turn_params.oauth_server_name,turn_params.readable_external_ip,turn_params.listener_port);
+
 		use_redis_cluster = 1;
 	}
 #endif
@@ -1622,9 +1624,13 @@ void run_listener_server(struct listener_server *ls)
 
 #if !defined(TURN_NO_HIREDIS)
 		if (use_redis_cluster)
-			report_node_live(rctx, addr);
+			report_node_live(rctx, key);
 #endif
 	}
+#if !defined(TURN_NO_HIREDIS)
+	if (use_redis_cluster)
+		send_message_to_redis(rctx,"del",key,"");
+#endif
 }
 
 static void setup_relay_server(struct relay_server *rs, ioa_engine_handle e, int to_set_rfc5780)
