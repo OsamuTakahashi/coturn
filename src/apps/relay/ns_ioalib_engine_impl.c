@@ -3571,7 +3571,8 @@ void turn_report_allocation_set(void *a, turn_time_t lifetime, int refresh)
 					}
 					send_message_to_redis(e->rch, "set", key, "%s lifetime=%lu", status, (unsigned long)lifetime);
 					send_message_to_redis(e->rch, "publish", key, "%s lifetime=%lu", status, (unsigned long)lifetime);
-					report_alloc();
+					if (!refresh)
+						report_alloc();
 				}
 #endif
 			}
