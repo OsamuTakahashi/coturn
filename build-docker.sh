@@ -11,5 +11,5 @@ docker="docker run --rm -it ${dockerargs} ${container_env} ${build_image}"
 
 docker build -f Dockerfile.build -t ${build_image} .
 
-${docker} bash -c "./configure && make"
+${docker} bash -c "ARCHIVERCMD='ar -rs' ./configure && make install"
 
